@@ -5,6 +5,7 @@ Shader "Custom/ParalaxNormal"
         _Color ("Color", Color) = (1,1,1,1)
         _NormalTexture ("Normal", 2D) = "bump" {}
         _HeightTexture ("Height", 2D) = "gray" {}
+        _HeightFactor ("Height Factor", Range(0.0,0.1)) = 0.03
     }
     SubShader
     {
@@ -25,14 +26,14 @@ Shader "Custom/ParalaxNormal"
             fixed4 _Color;
             sampler2D _NormalTexture;
             sampler2D _HeightTexture;
+            half _HeightFactor;
 
             struct Input
             {
                 float4 position : SV_POSITION;
-                float2 normalUV : TEXCOORD0;
-                float2 heightUV : TEXCOORD1;
-                float3 lightDirection : TEXCOORD2;
-                float3 viewDirection : TEXCOORD3;
+                float2 uv : TEXCOORD0;
+                float3 lightDirection : TEXCOORD1;
+                float3 viewDirection : TEXCOORD2;
             };
 
             float4x4 InverseTangentMatrix(float3 tangent, float3 binormal, float3 normal)
@@ -52,27 +53,30 @@ Shader "Custom/ParalaxNormal"
             {
                 Input input;
                 input.position = UnityObjectToClipPos(v.vertex);
-                input.normalUV = v.texcoord;
-                input.heightUV = v.texcoord1;
+                input.uv = v.texcoord;
 
-                float3 normal = v.normal;
-                float3 tangent = v.tangent;
-                float3 binormal = cross(normal, tangent);
+                // float3 normal = v.normal;
+                // float3 tangent = v.tangent;
+                // float3 binormal = cross(normal, tangent);
 
-                float3 localLight = mul( unity_WorldToObject, _WorldSpaceLightPos0 );
-                input.lightDirection = mul(localLight, InverseTangentMatrix(tangent,binormal,normal));
+                TANGENT_SPACE_ROTATION;
+                input.lightDirection = normalize( mul(rotation, ObjSpaceLightDir(v.vertex)) );
+                input.viewDirection = normalize( mul(rotation, ObjSpaceViewDir(v.vertex)) );
 
-                float3 localView = mul( unity_WorldToObject, _WorldSpaceCameraPos );
-                input.viewDirection = mul(localView, InverseTangentMatrix(tangent,binormal,normal));
+                // float3 localLight = mul( unity_WorldToObject, _WorldSpaceLightPos0 );
+                // input.lightDirection = mul(localLight, InverseTangentMatrix(tangent,binormal,normal));
+
+                // float3 localView = mul( unity_WorldToObject, _WorldSpaceCameraPos );
+                // input.viewDirection = mul(localView, InverseTangentMatrix(tangent,binormal,normal));
 
                 return input;
             }
 
             fixed4 frag(Input IN) : SV_Target
             {
-                float4 height = tex2D(_HeightTexture,IN.heightUV );
+                float4 height = tex2D(_HeightTexture,IN.uv );
 
-                float2 normalUV = IN.normalUV + IN.viewDirection.xy * height.r * 0.03;
+                float2 normalUV = IN.uv + IN.viewDirection.xy * height.r * _HeightFactor;
                 float3 normal = UnpackNormal(tex2D(_NormalTexture,normalUV));
                 float3 lightDirection = normalize( IN.lightDirection );
                 float diffuse = max(0,dot(normal,lightDirection));
