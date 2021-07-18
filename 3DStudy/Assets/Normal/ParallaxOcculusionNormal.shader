@@ -34,7 +34,6 @@ Shader "Custom/ParalaxOcculusionNormal"
                 float2 uv : TEXCOORD0;
                 float3 lightDirection : TEXCOORD1;
                 float3 objectViewDirection : TEXCOORD2;
-                float3 objectWorldPosition : TEXCOORD3;
             };
 
             Input vert(appdata_full v)
@@ -46,19 +45,18 @@ Shader "Custom/ParalaxOcculusionNormal"
                 TANGENT_SPACE_ROTATION;
                 input.lightDirection = mul(rotation, ObjSpaceLightDir(v.vertex));
 
-                input.objectWorldPosition = mul(unity_ObjectToWorld, v.vertex);
-                input.objectViewDirection = input.objectWorldPosition - _WorldSpaceCameraPos.xyz;
+                input.objectViewDirection = mul(rotation, ObjSpaceViewDir(v.vertex));
 
                 return input;
             }
 
             fixed4 frag(Input IN) : SV_Target
             {
-
-                // TOOD:https://coposuke.hateblo.jp/entry/2019/01/20/043042
-                // TODO:https://docs.google.com/presentation/d/1da7e1O6Ch8px-U1wttvTXIF-Hp3uxPuRVj2rySFVkDY/edit#slide=id.g6c23899137_0_79
+                // 参考:https://titanwolf.org/Network/Articles/Article?AID=3c01329d-d71a-4b11-ba56-b0ad82019c50#gsc.tab=0
 
                 float3 rayDirection = normalize(IN.objectViewDirection);
+                float2 diff = _HeightFactor * rayDirection.xy / rayDirection.z / 32;
+
                 float rayHeight = 1.0;
                 float objectHeight = 0.0;
                 float2 uv = IN.uv;
@@ -66,10 +64,10 @@ Shader "Custom/ParalaxOcculusionNormal"
                 [unroll]
                 for(int i = 0; i < 32 && objectHeight < rayHeight; ++i)
                 {
-                    uv += rayDirection * 0.01;
+                    uv -= diff;
 
                     objectHeight = tex2D(_HeightTexture,uv );
-                    rayHeight -= rayDirection.y * 0.01;
+                    rayHeight -= 1.0 / 32;
                 }
 
                 float2 normalUV = uv;
