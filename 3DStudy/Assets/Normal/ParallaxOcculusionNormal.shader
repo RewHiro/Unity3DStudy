@@ -1,4 +1,4 @@
-Shader "Custom/ParalaxNormal"
+Shader "Custom/ParalaxOcculusionNormal"
 {
     Properties
     {
@@ -33,22 +33,9 @@ Shader "Custom/ParalaxNormal"
                 float4 position : SV_POSITION;
                 float2 uv : TEXCOORD0;
                 float3 lightDirection : TEXCOORD1;
-                float3 viewDirection : TEXCOORD2;
+                float3 objectViewDirection : TEXCOORD2;
+                float3 objectWorldPosition : TEXCOORD3;
             };
-
-            float3x3 InverseTangentMatrix(float3 tangent, float3 binormal, float3 normal)
-            {
-                // return float3x3(tangent,binormal,normal);
-                float4x4 tangentMatrix = float4x4
-                (
-                    float4(tangent,0),
-                    float4(binormal,0),
-                    float4(normal,0),
-                    float4(0,0,0,1)                                                            
-                );
-
-                return transpose( tangentMatrix );
-            }
 
             Input vert(appdata_full v)
             {
@@ -58,16 +45,34 @@ Shader "Custom/ParalaxNormal"
 
                 TANGENT_SPACE_ROTATION;
                 input.lightDirection = mul(rotation, ObjSpaceLightDir(v.vertex));
-                input.viewDirection = mul(rotation, ObjSpaceViewDir(v.vertex));
+
+                input.objectWorldPosition = mul(unity_ObjectToWorld, v.vertex);
+                input.objectViewDirection = input.objectWorldPosition - _WorldSpaceCameraPos.xyz;
 
                 return input;
             }
 
             fixed4 frag(Input IN) : SV_Target
             {
-                float4 height = tex2D(_HeightTexture,IN.uv );
 
-                float2 normalUV = IN.uv + normalize( IN.viewDirection.xy ) * height.r * _HeightFactor;
+                // TOOD:https://coposuke.hateblo.jp/entry/2019/01/20/043042
+                // TODO:https://docs.google.com/presentation/d/1da7e1O6Ch8px-U1wttvTXIF-Hp3uxPuRVj2rySFVkDY/edit#slide=id.g6c23899137_0_79
+
+                float3 rayDirection = normalize(IN.objectViewDirection);
+                float rayHeight = 1.0;
+                float objectHeight = 0.0;
+                float2 uv = IN.uv;
+
+                [unroll]
+                for(int i = 0; i < 32 && objectHeight < rayHeight; ++i)
+                {
+                    uv += rayDirection * 0.01;
+
+                    objectHeight = tex2D(_HeightTexture,uv );
+                    rayHeight -= rayDirection.y * 0.01;
+                }
+
+                float2 normalUV = uv;
                 float3 normal = UnpackNormal(tex2D(_NormalTexture,normalUV));
                 float3 lightDirection = normalize( IN.lightDirection );
                 float diffuse = max(0,dot(normal,lightDirection));
