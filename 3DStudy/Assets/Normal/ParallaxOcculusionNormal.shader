@@ -53,24 +53,32 @@ Shader "Custom/ParalaxOcculusionNormal"
             fixed4 frag(Input IN) : SV_Target
             {
                 // 参考:https://titanwolf.org/Network/Articles/Article?AID=3c01329d-d71a-4b11-ba56-b0ad82019c50#gsc.tab=0
+                // 参考:https://www.programmersought.com/article/99606296884/
 
-                float3 rayDirection = normalize(IN.objectViewDirection);
-                float2 diff = _HeightFactor * rayDirection.xy / rayDirection.z / 32;
+                const float3 rayDirection = normalize(IN.objectViewDirection);
+                const int layers = 32;
+                const float2 deltaUV = _HeightFactor * rayDirection.xy / rayDirection.z / layers;
+                float deltaHeight = 1.0 / layers;
 
                 float rayHeight = 1.0;
-                float objectHeight = 0.0;
                 float2 uv = IN.uv;
+                float objectHeight = tex2D(_HeightTexture,uv );;
 
                 [unroll]
-                for(int i = 0; i < 32 && objectHeight < rayHeight; ++i)
+                for(int i = 0; i < layers && objectHeight < rayHeight; ++i)
                 {
-                    uv -= diff;
+                    uv -= deltaUV;
 
                     objectHeight = tex2D(_HeightTexture,uv );
-                    rayHeight -= 1.0 / 32;
+                    rayHeight -= deltaHeight;
                 }
 
-                float2 normalUV = uv;
+                float2 previousUV = uv + deltaUV;
+                float previousHeight = tex2D(_HeightTexture, previousUV ) - deltaHeight;
+                float nextHeight = objectHeight;
+                float ratio = nextHeight / ( nextHeight - previousHeight );
+
+                float2 normalUV = uv * (1.0 - ratio) + previousUV * ratio;
                 float3 normal = UnpackNormal(tex2D(_NormalTexture,normalUV));
                 float3 lightDirection = normalize( IN.lightDirection );
                 float diffuse = max(0,dot(normal,lightDirection));
