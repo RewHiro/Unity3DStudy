@@ -8,7 +8,7 @@ Material:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_Name: ParallaxOcculusionNormalWIthSelfShadow
-  m_Shader: {fileID: 4800000, guid: da070968273a1cc459044f62a5726fc8, type: 3}
+  m_Shader: {fileID: 4800000, guid: c39e5cf945259034e9d1cab894b3ac16, type: 3}
   m_ShaderKeywords: 
   m_LightmapFlags: 4
   m_EnableInstancingVariants: 0
@@ -77,7 +77,7 @@ Material:
     - _GlossMapScale: 1
     - _Glossiness: 0.5
     - _GlossyReflections: 1
-    - _HeightFactor: 0.0076
+    - _HeightFactor: 0.0065
     - _Metallic: 0
     - _Mode: 0
     - _OcclusionStrength: 1

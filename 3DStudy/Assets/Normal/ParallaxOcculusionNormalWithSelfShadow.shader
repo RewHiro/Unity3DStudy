@@ -83,7 +83,6 @@ Shader "Custom/ParalaxOcculusionNormalWithSelfShadow"
                 return currentUV * (1.0 - ratio) + previousUV * ratio;
             }
 
-            // FIXME:影の出方が逆っぽい
             float parallaxSoftShadowMultiplier( float3 lightDirection, float2 uv, float height )
             {
                 float shadowMultipiler = 1;
