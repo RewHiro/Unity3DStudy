@@ -3,11 +3,6 @@ Shader "Custom/ProjectionShadow"
 
     // https://light11.hatenadiary.com/entry/2020/02/26/201321
 
-    Properties
-    {
-        _Color ("Color", Color) = (1,1,1,1)
-        _NormalTexture ("Normal", 2D) = "bump" {}
-    }
     SubShader
     {
         Tags { "RenderType"="Opaque" }
@@ -24,52 +19,40 @@ Shader "Custom/ProjectionShadow"
             // Use shader model 3.0 target, to get nicer looking lighting
             #pragma target 3.0
 
-            sampler2D _NormalTexture;
-            fixed4 _Color;
-
-            struct Input
+            struct v2f
             {
                 float4 position : SV_POSITION;
-                float2 normalUV : TEXCOORD0;
-                float3 lightDirection : TEXCOORD1;
+                float4 projectorSpacePosition : TEXCOORD0;
+                float3 worldPosition : TEXCOORD1;
+                float3 worldNormal : TEXCOORD2;
             };
 
-            float4x4 InverseTangentMatrix(float3 tangent, float3 binormal, float3 normal)
-            {
-                float4x4 tangentMatrix = float4x4
-                (
-                    float4(tangent,0),
-                    float4(binormal,0),
-                    float4(normal,0),
-                    float4(0,0,0,1)                                                            
-                );
+            sampler2D _ShadowProjectorTexture;
+            float4x4 _ShadowProjectorMatrixVP;
+            float4 _ShadowProjectorPosition;
 
-                return transpose(tangentMatrix);
+            v2f vert(appdata_full v)
+            {
+                v2f o;
+                o.position = UnityObjectToClipPos(v.vertex);
+                o.projectorSpacePosition = mul(mul(_ShadowProjectorMatrixVP, unity_ObjectToWorld), v.vertex);
+                o.projectorSpacePosition = ComputeScreenPos(o.projectorSpacePosition);
+                o.worldNormal = UnityObjectToWorldNormal(v.normal);
+                o.worldPosition = mul( unity_ObjectToWorld, v.vertex );
+                return o;
             }
 
-            Input vert(appdata_full v)
+            fixed4 frag(v2f i) : SV_Target
             {
-                Input input;
-                input.position = UnityObjectToClipPos(v.vertex);
-                input.normalUV = v.texcoord;
+                i.projectorSpacePosition.xyz /= i.projectorSpacePosition.w;
+                float2 uv = i.projectorSpacePosition.xy;
+                float4 projectorTex = tex2D(_ShadowProjectorTexture, uv);
 
-                float3 normal = v.normal;
-                float3 tangent = v.tangent;
-                float3 binormal = cross(normal, tangent);
+                fixed3 isOut = step((i.projectorSpacePosition - 0.5) * sign(i.projectorSpacePosition), 0.5);
+                float alpha = isOut.x * isOut.y * isOut.z;
 
-                float3 localLight = mul( unity_WorldToObject, _WorldSpaceLightPos0 );
-
-                input.lightDirection = mul(localLight, InverseTangentMatrix(tangent,binormal,normal));
-
-                return input;
-            }
-
-            fixed4 frag(Input IN) : SV_Target
-            {
-                float3 normal = UnpackNormal(tex2D(_NormalTexture,IN.normalUV));
-                float3 lightDirection = normalize( IN.lightDirection );
-                float diffuse = max(0,dot(normal,lightDirection));
-                return diffuse * _Color;
+                alpha = step( -dot( lerp(-_ShadowProjectorPosition.xyz, _ShadowProjectorPosition.xyz - i.worldPosition, _ShadowProjectorPosition.w ), i.worldNormal ), 0 );
+                return lerp(1, projectorTex, alpha);
             }
             ENDCG
         }
